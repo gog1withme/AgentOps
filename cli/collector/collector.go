@@ -156,7 +156,20 @@ func (c *Collector) handleBudgetViolation(v *BudgetViolation, sessionID string) 
 }
 
 func (c *Collector) Close() {
-	close(c.done)
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+	for {
+		select {
+		case e := <-c.events:
+			c.processEvent(&e)
+		default:
+			close(c.done)
+			return
+		}
+	}
 }
 
 func formatFloat(v float64) string {

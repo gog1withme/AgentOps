@@ -12,5 +12,11 @@ import (
 
 func openDriver() (*sql.DB, error) {
 	dbPath := filepath.Join(paths.DataDir(), "events.db")
-	return sql.Open("sqlite", dbPath)
+	dsn := dbPath + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	return db, nil
 }

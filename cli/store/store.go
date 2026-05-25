@@ -89,6 +89,8 @@ func (s *Store) flushRetryLocked() error {
 }
 
 func (s *Store) UpsertPrompt(p *schema.Prompt) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	_, err := s.db.Exec(`
 		INSERT INTO prompts (hash, content, first_seen, last_seen, session_count, avg_cost_usd, avg_prompt_tokens, avg_efficiency_score)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
