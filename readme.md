@@ -4,6 +4,12 @@ Local-first observability for AI coding agents — passive hooks, privacy scrubb
 
 [![Release](https://img.shields.io/github/v/release/gog1withme/AgentOps)](https://github.com/gog1withme/AgentOps/releases)
 
+## What's new
+
+**[v1.0.0 (2026-05-25)](docs/releases/v1.0.0.md)** — First public release: live agent feed, LLM cost tracking, trace replay with one-click restore, MCP health, AI blame, and privacy scrubbing. [Full release notes →](docs/releases/v1.0.0.md)
+
+![AgentOps live activity feed showing real-time Cursor file edits](docs/assets/v1.0.0/live-activity-feed.png)
+
 ## Install
 
 **macOS / Linux**

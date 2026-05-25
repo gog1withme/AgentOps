@@ -6,6 +6,8 @@ All notable changes to AgentOps are documented in this file.
 
 First public release of AgentOps — local-first observability for AI coding agents.
 
+> Full release notes with use cases and screenshots: [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md)
+
 ### Added
 
 - **CLI**: `agentops init`, `dev`, `env`, `version`, `doctor`, `budget`, `restore`, `trace`, `replay`, `blame`, `prompt`, `mcp`, `alerts`, `sec`
@@ -13,7 +15,7 @@ First public release of AgentOps — local-first observability for AI coding age
 - **Privacy**: Pre-storage scrubber with configurable patterns
 - **Budgets**: Session cost/tool/LLM limits with alert, pause, and kill actions
 - **Storage**: DuckDB (macOS/Linux) and SQLite (Windows) event store
-- **Dashboard**: Live activity feed, token/cost tracking, trace replay, MCP health, budget banner
+- **Dashboard**: Live activity feed, traces with replay and restore, cost & efficiency charts, AI blame, MCP health, prompt versions, context inspector, security center, budget banner
 - **Distribution**: GitHub Releases, install scripts (`scripts/install.sh`, `scripts/install.ps1`), Homebrew tap support
 
 ### Install
