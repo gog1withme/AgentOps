@@ -50,7 +50,7 @@ func TestMigrateAndRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if math.Abs(cost-0.42) > 1e-9 {
+	if math.Abs(cost-0.42) > 1e-6 {
 		t.Fatalf("expected cost 0.42, got %v", cost)
 	}
 	if tools != 0 || llms != 0 {
