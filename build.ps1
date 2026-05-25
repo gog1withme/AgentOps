@@ -9,7 +9,7 @@ $Root = $PSScriptRoot
 $Binary = Join-Path $Root "bin\agentops.exe"
 $Dashboard = Join-Path $Root "dashboard"
 $Version = "1.0.0"
-$LdFlags = "-ldflags `"-X github.com/gog1withme/AgentOps/cli/version.Version=$Version`""
+$LdFlags = "-X github.com/gog1withme/AgentOps/cli/version.Version=$Version"
 
 function Ensure-Go {
     if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
@@ -27,7 +27,8 @@ switch ($Target) {
         Ensure-Go
         New-Item -ItemType Directory -Force -Path (Join-Path $Root "bin") | Out-Null
         Push-Location $Root
-        go build $LdFlags -o $Binary ./cli
+        go build -ldflags $LdFlags -o $Binary ./cli
+        if ($LASTEXITCODE -ne 0) { throw "go build failed with exit code $LASTEXITCODE" }
         Pop-Location
         Write-Host "Built $Binary"
     }
