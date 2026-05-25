@@ -1,6 +1,7 @@
 package store
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ func TestMigrateAndRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cost != 0.42 {
+	if math.Abs(cost-0.42) > 1e-9 {
 		t.Fatalf("expected cost 0.42, got %v", cost)
 	}
 	if tools != 0 || llms != 0 {
