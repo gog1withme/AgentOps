@@ -1,4 +1,4 @@
-.PHONY: build test dev lint dashboard clean
+.PHONY: build test dev lint dashboard qa clean
 
 VERSION ?= 1.0.0
 BINARY=bin/agentops
@@ -25,6 +25,9 @@ dashboard-build:
 
 dashboard-dev:
 	cd $(DASHBOARD) && npm run dev
+
+qa:
+	go run scripts/generate-qa.go
 
 clean:
 	rm -rf bin $(DASHBOARD)/.next $(DASHBOARD)/out

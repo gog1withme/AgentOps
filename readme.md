@@ -60,6 +60,8 @@ Detailed examples with screenshots: [v1.0.0 release notes](docs/releases/v1.0.0.
 
 See the full [roadmap](docs/ROADMAP.md) for planned features and industry direction.
 
+**Developer Q&A:** Technical answers tagged by release version — [docs/qa/](docs/qa/). Superseded answers stay visible with strikethrough when behavior changes.
+
 ## Install
 
 **macOS / Linux**

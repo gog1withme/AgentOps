@@ -113,3 +113,4 @@ Full internal spec: [context.md](../context.md)
 - Open a [GitHub Issue](https://github.com/gog1withme/AgentOps/issues) for feature requests or bugs
 - Vote on existing issues with 👍 to help prioritize
 - Contribute via pull request — see [development.context](../development.context)
+- Read or propose updates to the [Developer Q&A](qa/) — technical answers tagged by release version

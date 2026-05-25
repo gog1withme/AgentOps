@@ -1,0 +1,15 @@
+{
+  "id": "snapshot-restore-consistency",
+  "slug": "snapshot-restore-consistency",
+  "title": "What guarantees exist around snapshot consistency during restore/replay?",
+  "category": "restore",
+  "tags": ["snapshots", "restore", "replay", "git"],
+  "answers": [
+    {
+      "release": "1.0.0",
+      "status": "current",
+      "date": "2026-05-25",
+      "body": "**Replay** (session timeline) is strongly consistent — events are ordered from the local DuckDB/SQLite store and returned via `agentops replay` or `/api/sessions/:id/replay`.\n\n**Restore** is **best-effort, not transactional.** Implementation in `cli/snapshots/snapshots.go`:\n\n1. **Snapshot capture** — on session init, every 60 seconds, and on each `FILE_EDIT` event:\n   - `git diff HEAD` saved as `changes.patch`\n   - Untracked files copied into the snapshot directory\n   - Manifest written with timestamp, git HEAD, and file list\n\n2. **Restore steps** — `git checkout HEAD -- .` → `git apply` patch → copy untracked files back\n\n**What is NOT guaranteed:**\n\n- Atomic or rollback-safe restore (partial failure is possible; some git steps ignore errors)\n- Cleanup of files **created after** the snapshot point\n- Correctness after commits, rebases, or merges between snapshot and restore\n- Stash integration or handling of staged-but-uncommitted index state separately\n\n**Good for:** undoing a bad multi-file agent refactor in your working tree during a session.\n\n**Not for:** backup, disaster recovery, or guaranteed point-in-time consistency across git operations.\n\nUse `agentops restore --dry-run` to preview before applying."
+    }
+  ]
+}

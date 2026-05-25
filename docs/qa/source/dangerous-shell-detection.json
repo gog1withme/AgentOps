@@ -1,0 +1,15 @@
+{
+  "id": "dangerous-shell-detection",
+  "slug": "dangerous-shell-detection",
+  "title": "How are dangerous shell detections implemented without high false positives?",
+  "category": "security",
+  "tags": ["shell", "alerts", "security", "false-positives"],
+  "answers": [
+    {
+      "release": "1.0.0",
+      "status": "current",
+      "date": "2026-05-25",
+      "body": "v1.0 uses a **small substring blocklist**, not semantic or ML-based analysis. Rules live in `cli/collector/alerts.go`:\n\n```\nrm -rf /\nformat c:\nmkfs\n:(){ :|:& };:   (fork bomb)\ndd if=/dev/zero\n```\n\nWhen a hooked shell posts a matching command to `/api/ingest/shell`, a `dangerous_shell` critical alert is raised. The same patterns appear in `agentops sec scan`.\n\n**False positives:** Low for exact matches on real commands. Higher if someone echoes or discusses these strings in a hooked terminal (e.g. `echo \"rm -rf /\"`).\n\n**False negatives:** High — many destructive patterns are not covered: `rm -rf .`, `git push --force`, credential exfil, writes outside the project, or commands run in agent-integrated terminals that bypass shell hooks.\n\n**Alert dedup:** Same session + rule is suppressed for 5 minutes to avoid spam.\n\n**Design intent in v1.0:** Catch obviously catastrophic patterns with near-zero tuning, not provide comprehensive command policy enforcement. Roadmap: approval gates, richer rule sets, and hallucinated-command detection (see `docs/ROADMAP.md`)."
+    }
+  ]
+}

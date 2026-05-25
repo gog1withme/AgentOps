@@ -65,3 +65,4 @@ go test ./cli/...
 - CI green without `|| true` on E2E
 - No daemon crashes during a 30-minute session with live feed open
 - `agentops doctor --verbose` reports integration checks green after `init` + `dev`
+- Review `docs/qa/source/` — update any Q&A answers that changed behavior in this release (`make qa`)

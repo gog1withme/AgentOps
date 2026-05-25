@@ -1,0 +1,15 @@
+{
+  "id": "proxy-overhead",
+  "slug": "proxy-overhead",
+  "title": "What is the overhead of proxying and token inspection on long autonomous sessions?",
+  "category": "architecture",
+  "tags": ["proxy", "performance", "tokens", "latency"],
+  "answers": [
+    {
+      "release": "1.0.0",
+      "status": "current",
+      "date": "2026-05-25",
+      "body": "The LLM proxy (`cli/collector/proxy.go`) is a **streaming pass-through**:\n\n1. Read full request body from the agent\n2. Forward to upstream (OpenAI or Anthropic)\n3. Read full response body\n4. Return response to the agent\n5. Asynchronously ingest metadata + scrubbed content into the event store\n\n**Added latency:** Approximately one local HTTP hop plus JSON parse, privacy scrub, and DB write — not an extra upstream round-trip.\n\n**Memory:** Full request and response bodies are buffered per call (120s client timeout). Large context windows mean proportional RAM per request.\n\n**Backpressure:** The collector event channel holds 512 events; overflow drops events with a warning (`cli/collector/collector.go`).\n\n**Efficiency scoring:** After each LLM call, `ScoreEfficiency()` (`cli/collector/efficiency.go`) scans prompt chunks against output text — O(chunks × output length), cheap at typical sizes but non-zero at 100k+ tokens.\n\n**Published benchmarks:** None yet. Dogfood target (see `docs/dogfood-checklist.md`) is no daemon crashes during a 30-minute session with the live feed open.\n\nFor most interactive coding sessions the proxy should feel invisible; very long autonomous runs with huge payloads are the stress case."
+    }
+  ]
+}

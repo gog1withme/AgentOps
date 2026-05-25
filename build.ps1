@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "test", "dev", "lint", "dashboard-install", "dashboard-build", "all", "clean")]
+    [ValidateSet("build", "test", "dev", "lint", "qa", "dashboard-install", "dashboard-build", "all", "clean")]
     [string]$Target = "build"
 )
 
@@ -41,6 +41,12 @@ switch ($Target) {
         Ensure-Go
         Push-Location $Root
         go vet ./...
+        Pop-Location
+    }
+    "qa" {
+        Ensure-Go
+        Push-Location $Root
+        go run scripts/generate-qa.go
         Pop-Location
     }
     "dev" {

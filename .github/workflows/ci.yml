@@ -27,6 +27,8 @@ jobs:
         run: go build -ldflags "-X github.com/gog1withme/AgentOps/cli/version.Version=dev" -o bin/agentops ./cli
       - name: Test
         run: go test ./...
+      - name: Verify Q&A docs
+        run: go run scripts/generate-qa.go --check
 
   dashboard:
     runs-on: ubuntu-latest

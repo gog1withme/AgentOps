@@ -1,0 +1,15 @@
+{
+  "id": "passive-interception",
+  "slug": "passive-interception",
+  "title": "How does passive interception work without SDK integration?",
+  "category": "architecture",
+  "tags": ["proxy", "hooks", "cursor", "claude", "copilot", "mcp"],
+  "answers": [
+    {
+      "release": "1.0.0",
+      "status": "current",
+      "date": "2026-05-25",
+      "body": "AgentOps v1.0 uses four OS-level integration points — no SDK required:\n\n| Layer | Mechanism | What it captures |\n|-------|-----------|------------------|\n| LLM calls | `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL` → local reverse proxy at `/proxy` | Tokens, cost, model, system prompt hash |\n| Shell | `PROMPT_COMMAND` (bash/zsh) or PowerShell profile → POST `/api/ingest/shell` | Commands run in hooked terminal sessions |\n| File edits | `fsnotify` watcher on the project directory | Write/create events with diffs |\n| MCP | Patch `mcp.json` URLs to route through `/mcp/{server}` | Latency, errors, call volume (URL-based servers only) |\n\n**Agent detection** uses lightweight heuristics: User-Agent on LLM requests (`cli/collector/proxy.go`) and running process names for file attribution (`cli/internal/platform/attribution.go`).\n\n**Brittleness tradeoff:** We deliberately avoid deep editor integration. The proxy parses OpenAI and Anthropic JSON request/response shapes — if upstream APIs change, we update the parser, not your agent. Copilot is detected at init but may not route through the proxy unless it respects those env vars. MCP stdio/command servers are not proxied. Integrated terminals inside Cursor may not hit shell hooks unless they inherit a hooked shell profile.\n\nThis is the zero-friction onboarding bet: works immediately for Cursor and Claude Code when you run `agentops env` and restart the editor, at the cost of not having kernel-level provenance."
+    }
+  ]
+}
