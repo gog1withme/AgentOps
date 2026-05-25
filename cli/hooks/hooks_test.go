@@ -74,9 +74,8 @@ func TestPatchMCPFilePreservesBackupAndUpstream(t *testing.T) {
 }
 
 func TestApplyEnvWritesEnvFile(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("USERPROFILE", home)
-	t.Setenv("HOME", home)
+	dir := t.TempDir()
+	t.Setenv("AGENTOPS_DATA_DIR", filepath.Join(dir, "data"))
 
 	if err := ApplyEnv(4318); err != nil {
 		t.Fatal(err)

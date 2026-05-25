@@ -118,16 +118,15 @@ func appendSnippet(path, snippet string) error {
 }
 
 func setProxyEnv(port int) error {
-	home, _ := os.UserHomeDir()
-	envFile := filepath.Join(home, ".agentops", "env.sh")
 	base := fmt.Sprintf("http://127.0.0.1:%d/proxy", port)
 	content := fmt.Sprintf(`export OPENAI_BASE_URL=%q
 export ANTHROPIC_BASE_URL=%q
 export AGENTOPS_PORT=%d
 export AGENTOPS_ENABLED=1
 `, base, base, port)
+	envFile := filepath.Join(paths.AgentOpsDir(), "env.sh")
 	if runtime.GOOS == "windows" {
-		envFile = filepath.Join(home, ".agentops", "env.ps1")
+		envFile = filepath.Join(paths.AgentOpsDir(), "env.ps1")
 		content = fmt.Sprintf(`$env:OPENAI_BASE_URL=%q
 $env:ANTHROPIC_BASE_URL=%q
 $env:AGENTOPS_PORT=%d

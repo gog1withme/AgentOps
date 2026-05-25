@@ -34,7 +34,7 @@ switch ($Target) {
     "test" {
         Ensure-Go
         Push-Location $Root
-        go test ./...
+        go test ./cli/... ./schema/... ./scripts/...
         Pop-Location
     }
     "lint" {

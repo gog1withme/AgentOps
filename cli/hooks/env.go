@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/gog1withme/AgentOps/cli/internal/paths"
 )
 
 // ApplyEnv loads proxy environment variables into the current process.
@@ -33,11 +35,10 @@ func itoa(n int) string {
 
 // EnvFilePath returns the platform-specific env snippet path.
 func EnvFilePath() string {
-	home, _ := os.UserHomeDir()
 	if runtime.GOOS == "windows" {
-		return filepath.Join(home, ".agentops", "env.ps1")
+		return filepath.Join(paths.AgentOpsDir(), "env.ps1")
 	}
-	return filepath.Join(home, ".agentops", "env.sh")
+	return filepath.Join(paths.AgentOpsDir(), "env.sh")
 }
 
 // EnvSourceCommand returns the shell command to load proxy env vars.
