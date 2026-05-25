@@ -14,6 +14,6 @@ test.describe("AgentOps dashboard", () => {
   test("budget banner component exists in layout", async ({ page }) => {
     await page.goto("/");
     // Banner may be hidden when under threshold — layout should still render
-    await expect(page.getByText("AgentOps")).toBeVisible();
+    await expect(page.locator("aside").getByText("AgentOps", { exact: true })).toBeVisible();
   });
 });
