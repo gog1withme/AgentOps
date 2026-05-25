@@ -10,6 +10,56 @@ Local-first observability for AI coding agents — passive hooks, privacy scrubb
 
 ![AgentOps live activity feed showing real-time Cursor file edits](docs/assets/v1.0.0/live-activity-feed.png)
 
+## Why AgentOps?
+
+AI agents edit your code, run shell commands, and call MCP tools — often while you are away. AgentOps is a local flight recorder and control panel: passive hooks, zero SDK, privacy scrubbing before storage, and a dashboard at `localhost:4318`.
+
+## Use cases
+
+### Coding with AI assistants
+
+Works with Cursor, Claude Code, Copilot, and any OpenAI-compatible agent.
+
+| Scenario | What AgentOps does | Try it |
+|---|---|---|
+| Audit what the agent changed during release prep | Live feed streams every `FILE_EDIT` with timestamp and agent name | `agentops dev` |
+| Cap spend on a long refactor session | Budget limits + cost dashboard; banner at 80% of limit | `agentops budget set --cost 2.00 --action alert` |
+| Find bloated `@` context wasting tokens | Context Inspector shows efficiency score per LLM call | Open [localhost:4318/context/](http://localhost:4318/context/) |
+| Roll back a bad multi-file refactor | Trace replay with **Restore to here** on any event | `agentops restore --at "<timestamp>"` |
+| Trace a bug to an AI edit vs human edit | AI Blame shows every agent-caused change with diff | `agentops blame src/auth.ts` |
+
+### Supervising autonomous and background agents
+
+When an agent runs unattended — overnight refactors, background Cursor tasks, or long MCP tool chains — AgentOps gives you guardrails and visibility without changing how the agent works.
+
+| Scenario | How supervision works today |
+|---|---|
+| Agent runs while you are away | Set cost, tool, and LLM limits; dashboard warns at 80%; `pause` or `kill` the agent process at 100% |
+| Watch an unattended agent from a second screen | Live feed SSE streams LLM calls, shell commands, file edits, and MCP calls in real time |
+| Agent tries a destructive shell command | Security Center raises a critical `dangerous_shell` alert |
+| Agent enters an expensive token spiral | Alerts on 100k+ prompt tokens and low efficiency scores |
+| Post-mortem after a background run | Trace replay timeline + `agentops replay <id>` |
+| Agent corrupted the repo | One-click **Restore to here** on any trace event |
+| Long MCP tool chains degrade | MCP Health flags servers with p95 > 2s or error rate > 10% |
+
+**Supervision setup**
+
+```bash
+agentops budget set --cost 5.00 --tools 100 --action pause
+agentops dev
+# Leave dashboard open at http://localhost:4318 — alerts appear in Security Center
+```
+
+Detailed examples with screenshots: [v1.0.0 release notes](docs/releases/v1.0.0.md)
+
+## Roadmap
+
+- **Near-term (1.x)** — Smart insights, configurable alerts, prompt evals, SDK integrations
+- **Mid-term (1.x–2.x)** — Autonomous agent guardrails, cloud/CI agent tracing, multi-agent conflict detection
+- **Long-term (2.x+)** — OpenTelemetry GenAI export, RAG pipeline tracing, compliance audit trails, team observability
+
+See the full [roadmap](docs/ROADMAP.md) for planned features and industry direction.
+
 ## Install
 
 **macOS / Linux**
@@ -104,7 +154,7 @@ The Go server serves static files from `dashboard/out` when present (or from `~/
 
 Go CLI/daemon → scrubber → DuckDB (macOS/Linux) or SQLite (Windows) → HTTP API/SSE → Next.js dashboard
 
-See [context.md](context.md) and [development.context](development.context) for full spec.
+See [context.md](context.md) and [development.context](development.context) for full spec. Public roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Dogfood validation checklist: [docs/dogfood-checklist.md](docs/dogfood-checklist.md).
 
