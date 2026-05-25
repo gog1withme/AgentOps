@@ -60,12 +60,18 @@ func main() {
 	}
 
 	if *check {
-		for path, content := range outputs {
+		paths := make([]string, 0, len(outputs))
+		for path := range outputs {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		for _, path := range paths {
+			content := outputs[path]
 			existing, err := os.ReadFile(path)
 			if err != nil {
 				fatal(fmt.Errorf("%s: %w (run go run scripts/generate-qa.go)", path, err))
 			}
-			if string(existing) != content {
+			if normalizeEOL(string(existing)) != content {
 				fatal(fmt.Errorf("%s is out of date (run go run scripts/generate-qa.go)", path))
 			}
 		}
@@ -82,6 +88,10 @@ func main() {
 		}
 	}
 	fmt.Printf("Generated %d Q&A file(s)\n", len(outputs))
+}
+
+func normalizeEOL(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
 }
 
 func findRepoRoot() (string, error) {
