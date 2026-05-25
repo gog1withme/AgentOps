@@ -4,7 +4,7 @@ project_name: agentops
 
 before:
   hooks:
-    - cd dashboard && npm ci && npm run build
+    - sh -c "cd dashboard && (npm ci || npm install) && npm run build"
 
 builds:
   - id: agentops
@@ -25,10 +25,12 @@ builds:
         goarch: arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - dashboard/out/**/*
@@ -47,7 +49,6 @@ brews:
     repository:
       owner: gog1withme
       name: homebrew-agentops
-      token: "{{ .Env.GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/gog1withme/AgentOps"
     description: "Local-first observability for AI coding agents"
