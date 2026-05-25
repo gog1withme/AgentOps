@@ -1,0 +1,790 @@
+# AgentOps — Development Context
+# For use by AI coding agents (Claude Code, Cursor, etc.)
+# Last updated: v0.1 + v0.2 scope
+
+---
+
+## What You Are Building
+
+AgentOps is a **local-first, passive observability CLI + dashboard** for AI coding agents.
+
+It intercepts and traces activity from tools like Claude Code, Cursor, Copilot, Aider, and
+OpenAI SDKs — without requiring the developer to change their workflow or install SDKs.
+
+The end state for v0.1:
+```bash
+npx agentops init   # detect tools, inject hooks, activate privacy filter + budget
+agentops dev        # start daemon + open dashboard at localhost:4318
+```
+
+---
+
+## Repository Layout
+
+```
+agentops/
+├── cli/                        # Go CLI + daemon
+│   ├── main.go
+│   ├── cmd/
+│   │   ├── root.go
+│   │   ├── init.go             # agentops init
+│   │   ├── dev.go              # agentops dev
+│   │   ├── trace.go            # agentops trace / replay / diff
+│   │   ├── restore.go          # agentops restore <run_id>
+│   │   ├── blame.go            # agentops blame <file>
+│   │   ├── budget.go           # agentops budget set/status
+│   │   ├── prompt.go           # agentops prompt list/diff
+│   │   ├── mcp.go              # agentops mcp list
+│   │   ├── alerts.go
+│   │   ├── eval.go
+│   │   ├── sec.go
+│   │   └── doctor.go
+│   ├── collector/
+│   │   ├── collector.go        # main event ingestion loop
+│   │   ├── shell.go            # shell interception
+│   │   ├── filesystem.go       # fs watcher + attribution
+│   │   ├── proxy.go            # OpenAI-compatible HTTP proxy
+│   │   ├── mcp.go              # MCP proxy + health tracking
+│   │   ├── alerts.go           # alert rules engine
+│   │   ├── budget.go           # budget enforcement daemon
+│   │   └── efficiency.go       # token efficiency scoring
+│   ├── scrubber/
+│   │   ├── scrubber.go         # pre-storage secrets/PII filter
+│   │   ├── patterns.go         # built-in regex patterns
+│   │   └── patterns.txt        # default pattern file (shipped with binary)
+│   ├── detector/
+│   │   ├── detector.go
+│   │   ├── claude.go
+│   │   ├── cursor.go
+│   │   ├── copilot.go
+│   │   └── openai.go
+│   ├── store/
+│   │   ├── store.go            # DuckDB interface
+│   │   ├── schema.go           # all table definitions
+│   │   ├── queries.go          # named queries
+│   │   └── migrations/
+│   ├── snapshots/
+│   │   ├── snapshots.go        # file snapshot manager (time-travel)
+│   │   └── restore.go          # restore working tree from snapshot
+│   ├── hooks/
+│   │   ├── hooks.go
+│   │   ├── shell_hook.sh
+│   │   └── mcp_config.go
+│   └── server/
+│       └── server.go           # HTTP API + SSE
+│
+├── dashboard/                  # Next.js web UI
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx            # live activity feed
+│   │   ├── traces/
+│   │   │   ├── page.tsx
+│   │   │   └── [id]/page.tsx   # trace detail + restore button
+│   │   ├── cost/
+│   │   │   └── page.tsx        # token/cost + efficiency trend
+│   │   ├── context/
+│   │   │   └── page.tsx        # context inspector
+│   │   ├── blame/
+│   │   │   └── page.tsx        # AI diff attribution browser
+│   │   ├── mcp/
+│   │   │   └── page.tsx        # MCP server health
+│   │   ├── prompts/
+│   │   │   └── page.tsx        # prompt version list + diff
+│   │   └── security/
+│   │       └── page.tsx
+│   ├── components/
+│   │   ├── ActivityFeed.tsx
+│   │   ├── TraceTimeline.tsx
+│   │   ├── CostChart.tsx
+│   │   ├── TokenFlame.tsx
+│   │   ├── EfficiencyBadge.tsx
+│   │   ├── ContextTree.tsx
+│   │   ├── AlertBadge.tsx
+│   │   ├── BudgetBanner.tsx
+│   │   ├── BlameTable.tsx
+│   │   ├── MCPHealthRow.tsx
+│   │   └── PromptDiff.tsx
+│   ├── lib/
+│   │   ├── api.ts
+│   │   └── types.ts
+│   └── package.json
+│
+├── schema/
+│   └── event.go                # canonical Event struct
+│
+├── docs/
+│   ├── context.md
+│   └── development.context     # this file
+│
+├── Makefile
+└── README.md
+```
+
+---
+
+## Build Order (Follow This Exactly)
+
+### Step 1 — CLI scaffold + detector
+
+Same as before. See detector table:
+
+| Tool | Detection Method |
+|---|---|
+| Claude Code | `which claude` OR `~/.claude/` dir exists |
+| Cursor | `~/.cursor/` OR process name `Cursor` |
+| Copilot | VSCode extension dir OR `gh copilot` in PATH |
+| Aider | `which aider` |
+| OpenAI SDK | `pip show openai` OR `node -e "require('openai')"` |
+| MCP servers | Parse `~/.cursor/mcp.json`, `~/.config/claude/mcp.json` |
+
+`agentops init` output:
+```
+✓ Detected Claude Code
+✓ Detected Cursor (MCP config found: 3 servers)
+✗ Copilot not found
+✓ Shell: zsh
+✓ Privacy filter: active (14 pattern rules)
+✓ Budget: not set (run `agentops budget set` to configure)
+→ Installing hooks...
+✓ Done. Run `agentops dev` to start.
+```
+
+---
+
+### Step 2 — Scrubber (build before store)
+
+**Files:** `cli/scrubber/scrubber.go`, `cli/scrubber/patterns.go`, `cli/scrubber/patterns.txt`
+
+The scrubber is a **middleware pipeline** that every Event passes through before being written
+to DuckDB. It must run synchronously in the collector's write path — not async.
+
+**Interface:**
+```go
+type Scrubber struct {
+    patterns []*regexp.Regexp
+    replace  string  // default: "[REDACTED]"
+}
+
+func New(patternFile string) (*Scrubber, error)
+func (s *Scrubber) ScrubEvent(e *Event) *Event   // returns scrubbed copy, never mutates original
+func (s *Scrubber) ScrubString(input string) string
+```
+
+**Built-in patterns (patterns.txt — ship these):**
+```
+# OpenAI / Anthropic keys
+sk-[A-Za-z0-9]{20,}
+sk-ant-[A-Za-z0-9\-]{20,}
+
+# AWS
+AKIA[0-9A-Z]{16}
+[A-Za-z0-9/+=]{40}(?=.*AWS)
+
+# Generic secrets
+(?i)(api[_-]?key|secret|password|passwd|token|auth)["\s:=]+[^\s"',;]{8,}
+
+# JWTs
+eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+
+
+# Private keys
+-----BEGIN [A-Z ]*PRIVATE KEY-----
+
+# .env style
+(?m)^[A-Z_]{3,}=[^\n]{8,}$
+
+# GitHub tokens
+gh[pousr]_[A-Za-z0-9]{36,}
+```
+
+**Fields to scrub on every Event:**
+- `ToolInput`, `ToolOutput`, `ShellCommand`, `FileDiff`, `Error`
+- All values in `Metadata` map
+
+**Fields NOT scrubbed:**
+- `FilePath` (paths are fine, content is not)
+- `Model`, `Source`, `Type`, `Timestamp`, `ID`, `SessionID`, numeric fields
+
+**User extension:** merge patterns from `~/.agentops/scrub_patterns.txt` at startup if present.
+
+**Test:** `scrubber_test.go` must cover all built-in patterns with real-looking fake secrets.
+
+---
+
+### Step 3 — Event schema + DuckDB store
+
+**Canonical Event struct** (add new fields vs original):
+```go
+type Event struct {
+    ID             string
+    SessionID      string
+    RunID          string
+    Timestamp      time.Time
+    Source         string
+    Type           EventType
+    Model          string
+    PromptHash     string          // SHA-256 of system prompt, links to prompts table
+    PromptTokens   int
+    OutputTokens   int
+    EfficiencyScore float64        // 0-100, set by efficiency.go after each LLM call
+    CostUSD        float64
+    DurationMS     int
+    ToolName       string
+    ToolInput      string          // scrubbed before storage
+    ToolOutput     string          // scrubbed before storage
+    FilePath       string
+    FileDiff       string          // scrubbed
+    ShellCommand   string          // scrubbed
+    ShellExitCode  int
+    MCPServer      string          // MCP server name for mcp_call events
+    MCPLatencyMS   int
+    Error          string          // scrubbed
+    Metadata       map[string]string
+}
+
+// New event types
+const (
+    // existing ...
+    EventMCPCall       EventType = "mcp_call"
+    EventBudgetAlert   EventType = "budget_alert"
+    EventRestore       EventType = "restore"
+    EventConflict      EventType = "agent_conflict"   // v0.3
+)
+```
+
+**All DuckDB tables:**
+
+```sql
+-- Main events table (unchanged + new columns)
+CREATE TABLE IF NOT EXISTS events (
+    id VARCHAR PRIMARY KEY,
+    session_id VARCHAR NOT NULL,
+    run_id VARCHAR,
+    timestamp TIMESTAMPTZ NOT NULL,
+    source VARCHAR NOT NULL,
+    type VARCHAR NOT NULL,
+    model VARCHAR,
+    prompt_hash VARCHAR,
+    prompt_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    efficiency_score DOUBLE DEFAULT 0,
+    cost_usd DOUBLE DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    tool_name VARCHAR,
+    tool_input TEXT,
+    tool_output TEXT,
+    file_path VARCHAR,
+    file_diff TEXT,
+    shell_command TEXT,
+    shell_exit_code INTEGER,
+    mcp_server VARCHAR,
+    mcp_latency_ms INTEGER DEFAULT 0,
+    error TEXT,
+    metadata JSON
+);
+
+-- Prompt versions
+CREATE TABLE IF NOT EXISTS prompts (
+    hash VARCHAR PRIMARY KEY,       -- SHA-256 of full system prompt
+    content TEXT NOT NULL,          -- scrubbed prompt text
+    first_seen TIMESTAMPTZ NOT NULL,
+    last_seen TIMESTAMPTZ NOT NULL,
+    session_count INTEGER DEFAULT 1,
+    avg_cost_usd DOUBLE DEFAULT 0,
+    avg_prompt_tokens INTEGER DEFAULT 0,
+    avg_efficiency_score DOUBLE DEFAULT 0
+);
+
+-- AI file attribution
+CREATE TABLE IF NOT EXISTS attribution (
+    id VARCHAR PRIMARY KEY,
+    session_id VARCHAR NOT NULL,
+    run_id VARCHAR,
+    timestamp TIMESTAMPTZ NOT NULL,
+    file_path VARCHAR NOT NULL,
+    agent VARCHAR NOT NULL,         -- "claude", "cursor", etc.
+    lines_added INTEGER DEFAULT 0,
+    lines_removed INTEGER DEFAULT 0,
+    diff TEXT,                      -- scrubbed
+    event_id VARCHAR                -- FK to events.id
+);
+
+-- MCP server health (rolling window, updated in-place)
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    name VARCHAR PRIMARY KEY,
+    url VARCHAR,
+    first_seen TIMESTAMPTZ,
+    last_seen TIMESTAMPTZ,
+    total_calls INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    avg_latency_ms DOUBLE DEFAULT 0,
+    p95_latency_ms DOUBLE DEFAULT 0,
+    avg_response_bytes INTEGER DEFAULT 0
+);
+
+-- Budget config
+CREATE TABLE IF NOT EXISTS budgets (
+    session_id VARCHAR PRIMARY KEY,
+    cost_limit_usd DOUBLE,
+    tool_call_limit INTEGER,
+    llm_call_limit INTEGER,
+    action VARCHAR DEFAULT 'alert',  -- 'alert' | 'pause' | 'kill'
+    created_at TIMESTAMPTZ,
+    triggered_at TIMESTAMPTZ         -- null if not yet hit
+);
+
+-- File snapshots manifest (actual files stored on disk)
+CREATE TABLE IF NOT EXISTS snapshots (
+    id VARCHAR PRIMARY KEY,
+    session_id VARCHAR NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    trigger VARCHAR NOT NULL,        -- 'periodic' | 'file_edit' | 'manual'
+    snapshot_path VARCHAR NOT NULL,  -- path under ~/.agentops/snapshots/
+    file_count INTEGER DEFAULT 0,
+    size_bytes INTEGER DEFAULT 0
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_events_session    ON events(session_id);
+CREATE INDEX IF NOT EXISTS idx_events_timestamp  ON events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type);
+CREATE INDEX IF NOT EXISTS idx_events_prompt     ON events(prompt_hash);
+CREATE INDEX IF NOT EXISTS idx_attribution_file  ON attribution(file_path);
+CREATE INDEX IF NOT EXISTS idx_attribution_sess  ON attribution(session_id);
+CREATE INDEX IF NOT EXISTS idx_snapshots_session ON snapshots(session_id);
+```
+
+Store path: `~/.agentops/data/events.duckdb`
+
+---
+
+### Step 4 — Collector daemon
+
+**Files:** `cli/collector/collector.go`, `proxy.go`, `shell.go`, `filesystem.go`, `mcp.go`, `budget.go`, `efficiency.go`
+
+**Collector pipeline for every event:**
+```
+raw event
+    → scrubber.ScrubEvent()
+    → efficiency scoring (if LLM call)
+    → store.WriteEvent()
+    → budget.Check()
+    → alerts.Check()
+    → broadcast to SSE clients
+```
+
+**OpenAI proxy (`proxy.go`):** (unchanged from original spec, plus):
+- Extract system prompt from request messages array (role: "system")
+- Compute `prompt_hash = sha256(system_prompt_content)`
+- Upsert into `prompts` table
+- Set `Event.PromptHash` on the LLMCall event
+
+**Filesystem watcher (`filesystem.go`):** (unchanged, plus):
+- On each file write event, also insert into `attribution` table
+- Attribution record: derive `agent` from which process last touched the file
+  - Check if `claude` or `cursor` process has the file open: `lsof <file> | grep -E 'claude|cursor'`
+  - Fall back to `source = "unknown"` if ambiguous
+
+**MCP collector (`mcp.go`):**
+- Sits as a transparent proxy between the agent and MCP servers
+- Intercepts JSON-RPC calls, records: server name, method, latency, response size, errors
+- Emit `EventMCPCall` per call
+- After each call, upsert `mcp_servers` table with rolling stats:
+  ```go
+  // Use exponential moving average for latency
+  newAvg = 0.9 * oldAvg + 0.1 * float64(latencyMS)
+  ```
+- Activation: `agentops init` patches `~/.cursor/mcp.json` to route through proxy
+
+**Token efficiency scorer (`efficiency.go`):**
+```go
+// Called immediately after an LLM call event is recorded
+// Heuristic: scan output text for references to input context segments
+// "referenced" = output contains >5 consecutive tokens that appear in input
+func ScoreEfficiency(promptText, outputText string) float64 {
+    // Split prompt into chunks (by file boundary or paragraph)
+    // For each chunk, check if any 6-word window appears in output
+    // score = chunks_referenced / total_chunks * 100
+    // Cap at 100, floor at 0
+}
+```
+Store result in `Event.EfficiencyScore`. Also update `prompts.avg_efficiency_score` via running average.
+
+**Budget daemon (`budget.go`):**
+```go
+type BudgetChecker struct {
+    store    *store.Store
+    config   *config.Config
+}
+
+// Called after every LLM call and tool call event
+func (b *BudgetChecker) Check(sessionID string) *BudgetViolation
+
+type BudgetViolation struct {
+    Rule       string   // "cost_limit" | "tool_call_limit" | "llm_call_limit"
+    Current    float64
+    Limit      float64
+    Action     string
+}
+
+// Actions
+func (b *BudgetChecker) Pause(agentPID int)  // SIGSTOP
+func (b *BudgetChecker) Kill(agentPID int)   // SIGTERM then SIGKILL after 5s
+func (b *BudgetChecker) Alert(v *BudgetViolation)  // write EventBudgetAlert + SSE push
+```
+
+Budget limits query (run after each new event):
+```sql
+SELECT
+    SUM(cost_usd) as total_cost,
+    COUNT(*) FILTER (WHERE type='tool_call') as tool_calls,
+    COUNT(*) FILTER (WHERE type='llm_call') as llm_calls
+FROM events
+WHERE session_id = ? AND timestamp > ?
+```
+
+---
+
+### Step 5 — Snapshot manager (time-travel)
+
+**Files:** `cli/snapshots/snapshots.go`, `cli/snapshots/restore.go`
+
+**On `agentops dev` start:**
+```go
+func InitSession(sessionID, workDir string) error {
+    // 1. Run `git status` — if in a git repo, note current HEAD
+    // 2. Create snapshot dir: ~/.agentops/snapshots/<session_id>/
+    // 3. Take initial snapshot (snapshot_000)
+    // 4. Start periodic ticker: every 60s → TakeSnapshot()
+}
+```
+
+**Taking a snapshot:**
+```go
+func TakeSnapshot(sessionID, workDir, trigger string) (snapshotID string, err error) {
+    // 1. Run `git diff HEAD` — save full diff as patch file
+    // 2. List untracked files (`git ls-files --others --exclude-standard`)
+    // 3. Copy untracked files verbatim into snapshot dir
+    // 4. Record manifest: { timestamp, git_head, patch_file, untracked_files[] }
+    // 5. Insert into snapshots table
+}
+```
+
+**Restoring:**
+```go
+func Restore(sessionID, snapshotID, workDir string) error {
+    // 1. Load snapshot manifest
+    // 2. `git checkout HEAD -- .`  (reset tracked files)
+    // 3. `git apply <patch_file>`  (re-apply changes up to snapshot point)
+    // 4. Copy untracked files back from snapshot dir
+    // 5. Print: "✓ Restored to <timestamp>. <N> files changed."
+}
+```
+
+**CLI (`cmd/restore.go`):**
+```
+agentops restore                          # list recent sessions with snapshot counts
+agentops restore <run_id>                 # list snapshots for that session
+agentops restore <run_id> --at <ts>       # restore to closest snapshot before <ts>
+agentops restore <run_id> --snapshot <id> # restore to exact snapshot
+agentops restore --dry-run                # show what would change, don't apply
+```
+
+Dashboard: every event row in trace detail has a "↩ Restore to here" button that
+calls `POST /api/restore { session_id, snapshot_id }`.
+
+---
+
+### Step 6 — HTTP API server
+
+**File:** `cli/server/server.go`
+
+**All endpoints:**
+
+```
+GET  /api/events                  ?limit=100&since=<ts>&source=<>&type=<>
+GET  /api/events/:id
+GET  /api/sessions                list sessions with summary stats
+GET  /api/sessions/:id
+GET  /api/sessions/:id/replay     ordered events for timeline replay
+GET  /api/cost                    token + cost aggregates
+GET  /api/cost?group_by=model|source|run_id
+GET  /api/cost/efficiency         efficiency score trend over time
+GET  /api/alerts                  active + dismissed alerts
+GET  /api/stats                   summary stats for current session
+GET  /api/budget                  current budget config + spend vs limits
+GET  /api/blame/:filepath         AI attribution history for a file (URL-encoded path)
+GET  /api/mcp                     all MCP servers + health metrics
+GET  /api/mcp/:name               single server detail + call history
+GET  /api/prompts                 all prompt versions
+GET  /api/prompts/:hash           single prompt detail
+GET  /api/prompts/diff?a=<h>&b=<h> unified diff between two prompt versions
+GET  /api/snapshots               list snapshots for current session
+POST /api/restore                 { session_id, snapshot_id } → triggers restore
+WS   /api/stream                  SSE for live events + budget alerts
+```
+
+SSE stream event types:
+```json
+{ "type": "event",          "data": { ...Event } }
+{ "type": "budget_warning", "data": { "rule": "cost_limit", "pct": 85 } }
+{ "type": "budget_hit",     "data": { "rule": "cost_limit", "action": "pause" } }
+{ "type": "mcp_alert",      "data": { "server": "filesystem", "issue": "latency_spike" } }
+```
+
+---
+
+### Step 7 — `agentops dev` command
+
+**File:** `cli/cmd/dev.go`
+
+Start order:
+1. Load config, resolve budget settings
+2. Init snapshot manager for current session
+3. Start scrubber (load patterns)
+4. Start collector goroutines (proxy, shell, fs, mcp)
+5. Start budget daemon
+6. Start alerts engine
+7. Serve API + static dashboard on `:4318`
+8. Open browser
+
+Terminal output:
+```
+  agentops dev
+  ─────────────────────────────────────────
+  Dashboard  →  http://localhost:4318
+  Collector  →  listening
+  Proxy      →  http://localhost:4318/proxy
+
+  Watching:    Claude Code, Cursor (3 MCP servers), shell, filesystem
+  Privacy:     active (14 rules)
+  Budget:      $2.00 / 50 tools  [action: pause]
+  Snapshots:   ~/.agentops/snapshots/<session_id>/
+
+  Press Ctrl+C to stop.
+```
+
+---
+
+### Step 8 — Dashboard (Next.js)
+
+**Stack:** Next.js 14 (App Router) + Tailwind CSS + shadcn/ui + Recharts
+
+**Design rules:**
+- Dark theme (`bg-zinc-950`, `text-zinc-100`)
+- Accent: `violet-500` interactive, `emerald-500` success, `amber-500` warning, `red-500` error
+- Font: Inter
+- Sidebar: fixed left, 220px, icon + label
+- Cards: `bg-zinc-900 border border-zinc-800 rounded-xl`
+- Flat, no gradients, high contrast
+
+**New pages beyond original spec:**
+
+**`/blame` — AI Diff Attribution**
+- Left panel: file tree of all files touched this session
+- Right panel: click a file → timeline of every AI edit
+  - Each row: timestamp, agent badge, +N/-N lines, expandable diff
+  - Diff rendered with `react-diff-view` or similar
+- Search/filter by agent, date range
+
+**`/mcp` — MCP Server Health**
+- Table: server name, status dot (green/amber/red), call count, error rate, avg latency, p95 latency
+- Click a server → call history chart (latency over time), recent errors
+- Alert badges inline: "⚠ p95 > 2s", "✗ error rate 15%"
+
+**`/prompts` — Prompt Versions**
+- Table: hash (first 8 chars), first seen, sessions, avg cost, avg tokens, avg efficiency score
+- Click → full prompt text (scrubbed), list of sessions using it
+- "Compare" button: select two → side-by-side unified diff
+
+**Budget banner (global, in layout.tsx):**
+```
+When spend > 80% of limit:
+┌─────────────────────────────────────────────────────┐
+│ ⚠ Budget  $1.67 / $2.00 (84%)  ·  43 / 50 tools    │
+└─────────────────────────────────────────────────────┘
+amber background, dismissible per session
+```
+
+**Efficiency badge (on all LLM call events):**
+- Green circle: score ≥ 70
+- Amber circle: 40–69
+- Red circle: < 40
+- Tooltip: "1,200 of 8,400 prompt tokens referenced in output"
+
+**Trace detail — restore button:**
+Each event row in the timeline has a hover action:
+```
+[↩ Restore to here]  — calls POST /api/restore
+```
+Shows confirmation modal: "This will reset your working directory to <timestamp>. Continue?"
+
+---
+
+### Step 9 — Alerts engine
+
+**File:** `cli/collector/alerts.go`
+
+All original rules plus:
+
+```sql
+-- Budget at 80% threshold
+SELECT SUM(cost_usd) / budget_limit * 100 as pct
+FROM events e JOIN budgets b ON e.session_id = b.session_id
+WHERE e.session_id = ? AND pct >= 80
+
+-- Low efficiency: session average below 30%
+SELECT AVG(efficiency_score) as avg_eff
+FROM events WHERE session_id = ? AND type = 'llm_call'
+HAVING avg_eff < 30
+
+-- MCP latency spike: server's recent avg > 3x its historical avg
+SELECT mcp_server,
+    AVG(mcp_latency_ms) FILTER (WHERE timestamp > now() - INTERVAL '5 minutes') as recent,
+    AVG(mcp_latency_ms) as historical
+FROM events WHERE type = 'mcp_call' AND mcp_server = ?
+HAVING recent > historical * 3
+
+-- MCP error spike: >10% error rate in last 50 calls
+SELECT mcp_server, COUNT(*) FILTER (WHERE error IS NOT NULL) / COUNT(*) as err_rate
+FROM events WHERE type = 'mcp_call' AND mcp_server = ?
+ORDER BY timestamp DESC LIMIT 50
+HAVING err_rate > 0.10
+
+-- Prompt regression: new prompt hash has >20% higher cost than previous
+SELECT prompt_hash, avg_cost_usd FROM prompts
+ORDER BY first_seen DESC LIMIT 2
+-- check if newest / previous > 1.2
+```
+
+---
+
+## Key Implementation Notes
+
+### Go module
+```
+module github.com/agentops-dev/agentops
+go 1.22
+```
+
+### Go dependencies
+```
+github.com/spf13/cobra              # CLI
+github.com/marcboeker/go-duckdb     # DuckDB
+github.com/fsnotify/fsnotify        # fs watching
+github.com/oklog/ulid/v2            # ULIDs
+github.com/rs/zerolog               # logging
+github.com/gofiber/fiber/v2         # HTTP server
+github.com/sergi/go-diff/diffmatchpatch  # prompt diffing
+crypto/sha256                       # prompt hashing (stdlib)
+```
+
+### Config file `~/.agentops/config.json`
+```json
+{
+  "version": "0.1.0",
+  "session_id": "<ulid>",
+  "detected_tools": ["claude", "cursor", "shell"],
+  "proxy_port": 4318,
+  "collector_port": 4317,
+  "hooks_installed": true,
+  "data_dir": "~/.agentops/data",
+  "snapshots_dir": "~/.agentops/snapshots",
+  "scrub_patterns_file": "~/.agentops/scrub_patterns.txt",
+  "budget": {
+    "cost_limit_usd": 2.00,
+    "tool_call_limit": 50,
+    "action": "pause"
+  }
+}
+```
+
+### Collector concurrency model
+```go
+type Collector struct {
+    events   chan Event     // buffered, size 512
+    store    *store.Store
+    scrubber *scrubber.Scrubber
+    budget   *budget.Checker
+    alerts   *alerts.Engine
+    done     chan struct{}
+}
+
+// Single writer goroutine — all events flow through here
+func (c *Collector) writeLoop() {
+    for e := range c.events {
+        scrubbed := c.scrubber.ScrubEvent(&e)
+        c.store.WriteEvent(scrubbed)
+        c.budget.Check(scrubbed.SessionID)
+        c.alerts.Check(scrubbed)
+        c.broadcast(scrubbed)  // SSE
+    }
+}
+```
+
+### Error handling
+- Never panic in daemon. Log and continue.
+- DuckDB write failure: buffer in ring buffer (max 1000), retry with backoff
+- Proxy upstream failure: pass error through to caller, still log event with `Error` field set
+- Scrubber failure: log error, store event with all string fields replaced by `[SCRUB_ERROR]`
+- Snapshot failure: log, continue — never block the main collector
+
+### Testing
+- `scrubber_test.go`: test every pattern against real-looking fake secrets
+- `efficiency_test.go`: test scorer against known prompt/output pairs
+- `budget_test.go`: seed DuckDB with events, verify violations trigger correctly
+- `proxy_test.go`: integration test with mock upstream
+- `detector/*_test.go`: mock filesystem per tool
+- Dashboard: Playwright E2E for blame page and restore confirmation flow (v0.2)
+
+---
+
+## Environment Variables
+
+```bash
+AGENTOPS_DATA_DIR           # override ~/.agentops/data
+AGENTOPS_PORT               # override 4318
+AGENTOPS_LOG_LEVEL          # debug|info|warn|error
+AGENTOPS_NO_BROWSER         # =1 skip auto-open
+AGENTOPS_REDACT_CONTENT     # =1 redact all prompt/output text (keep only metadata)
+AGENTOPS_NO_SNAPSHOTS       # =1 disable time-travel snapshots
+AGENTOPS_BUDGET_COST        # override budget cost limit (float)
+AGENTOPS_BUDGET_ACTION      # override budget action: alert|pause|kill
+OPENAI_BASE_URL             # set by agentops init → proxy
+ANTHROPIC_BASE_URL          # set by agentops init → proxy
+```
+
+---
+
+## What NOT to Build in v0.1
+
+- Cloud sync or team features
+- `agentops eval` (v0.2)
+- Multi-agent conflict detection (v0.3)
+- Prompt governance / approval workflows (v0.3)
+- Any authentication
+- AI-powered smart callouts (v0.2)
+
+The scrubber, budget daemon, and snapshot manager ARE v0.1 — do not defer them.
+
+---
+
+## Definition of Done for v0.1
+
+- [ ] `agentops init` completes in < 3s, detects tools, reports privacy filter active
+- [ ] `agentops dev` starts daemon + opens dashboard without errors
+- [ ] OpenAI proxy intercepts, scrubs, and records LLM calls accurately
+- [ ] Scrubber strips all 8 built-in secret patterns from test inputs
+- [ ] Shell hook records commands + exit codes
+- [ ] Filesystem watcher records file edits + inserts attribution rows
+- [ ] Budget daemon triggers alert at 80%, correct action (pause/kill/alert) at 100%
+- [ ] Snapshot taken on session start; `agentops restore` lists snapshots and applies correctly
+- [ ] Prompt hash captured per LLM call; `agentops prompt list` shows versions
+- [ ] MCP calls recorded with latency; `/mcp` page shows per-server health
+- [ ] Efficiency score computed and stored on every LLM call event
+- [ ] Live feed shows events < 500ms latency
+- [ ] Budget banner appears in dashboard when > 80% of limit
+- [ ] Trace detail "Restore to here" button works end-to-end
+- [ ] Daemon < 50MB RSS under normal load
+- [ ] No events dropped at 100 events/second sustained
+- [ ] Dashboard loads < 1s on localhost
+- [ ] Works on macOS arm64, macOS x86, Linux x86_64

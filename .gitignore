@@ -1,0 +1,10 @@
+bin/
+.dashboard/
+.next/
+out/
+node_modules/
+*.duckdb
+*.duckdb.wal
+.env
+.env.local
+.DS_Store

@@ -1,0 +1,59 @@
+version: 2
+
+project_name: agentops
+
+before:
+  hooks:
+    - cd dashboard && npm ci && npm run build
+
+builds:
+  - id: agentops
+    main: ./cli
+    binary: agentops
+    ldflags:
+      - -s -w
+      - -X github.com/gog1withme/AgentOps/cli/version.Version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - dashboard/out/**/*
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: gog1withme
+    name: AgentOps
+  name_template: "v{{.Version}}"
+
+brews:
+  - name: agentops
+    repository:
+      owner: gog1withme
+      name: homebrew-agentops
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/gog1withme/AgentOps"
+    description: "Local-first observability for AI coding agents"
+    license: "MIT"
+    install: |
+      bin.install "agentops"
+      (share/"agentops").install "dashboard"
+    test: |
+      system "#{bin}/agentops", "version"
