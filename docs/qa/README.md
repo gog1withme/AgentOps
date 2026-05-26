@@ -19,7 +19,7 @@ See [MAINTAIN.md](MAINTAIN.md) for how to update Q&A on each release.
 
 ## Roadmap
 
-- [What percentage of README features are production-complete vs heuristic?](roadmap/feature-maturity.md) — `v1.0.0`
+- [What percentage of README features are production-complete vs heuristic?](roadmap/feature-maturity.md) — `v1.0.1`
 
 ## Security
 

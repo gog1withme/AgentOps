@@ -1,6 +1,6 @@
 .PHONY: build test dev lint dashboard qa clean
 
-VERSION ?= 1.0.0
+VERSION ?= 1.0.1
 BINARY=bin/agentops
 DASHBOARD=dashboard
 LDFLAGS=-ldflags "-X github.com/gog1withme/AgentOps/cli/version.Version=$(VERSION)"

@@ -76,6 +76,7 @@ func (s *Server) routes() {
 	api.Get("/sessions/:id/replay", s.replaySession)
 	api.Get("/cost", s.cost)
 	api.Get("/cost/efficiency", s.efficiency)
+	api.Get("/context/analysis", s.contextAnalysis)
 	api.Get("/alerts", s.alerts)
 	api.Get("/stats", s.stats)
 	api.Get("/budget", s.budget)

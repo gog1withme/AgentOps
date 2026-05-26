@@ -31,6 +31,16 @@ export const api = {
   prompts: () => fetchJSONArray<import("./types").Prompt>("/api/prompts"),
   alerts: () => fetchJSONArray<import("./types").AlertRecord>("/api/alerts"),
   snapshots: () => fetchJSONArray<import("./types").Snapshot>("/api/snapshots"),
+  contextAnalysis: async (sessionId?: string) => {
+    const q = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const data = await fetchJSON<import("./types").ContextAnalysis>(`/api/context/analysis${q}`);
+    return {
+      ...data,
+      duplicate_files: Array.isArray(data.duplicate_files) ? data.duplicate_files : [],
+      noisy_files: Array.isArray(data.noisy_files) ? data.noisy_files : [],
+      callouts: Array.isArray(data.callouts) ? data.callouts : [],
+    };
+  },
   restore: (sessionId: string, snapshotId: string) =>
     fetchJSON<{ ok: boolean }>("/api/restore", {
       method: "POST",

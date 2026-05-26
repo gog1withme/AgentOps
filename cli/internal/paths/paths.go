@@ -42,6 +42,13 @@ func ScrubPatternsPath() string {
 	return filepath.Join(AgentOpsDir(), "scrub_patterns.txt")
 }
 
+func PricingPath() string {
+	if v := os.Getenv("AGENTOPS_PRICING"); v != "" {
+		return v
+	}
+	return filepath.Join(AgentOpsDir(), "pricing.json")
+}
+
 func DuckDBPath() string {
 	return filepath.Join(DataDir(), "events.duckdb")
 }

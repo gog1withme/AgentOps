@@ -47,4 +47,6 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(envCmd)
 	rootCmd.AddCommand(secCmd)
+	rootCmd.AddCommand(contextCmd)
+	rootCmd.AddCommand(upgradeCmd)
 }

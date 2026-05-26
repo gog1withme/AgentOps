@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gog1withme/AgentOps/cli/store"
@@ -13,16 +14,19 @@ import (
 )
 
 type MCPProxy struct {
-	collector *Collector
-	servers   map[string]string
-	client    *http.Client
+	collector     *Collector
+	servers       map[string]string
+	client        *http.Client
+	latencyMu     sync.Mutex
+	latencyWindow map[string][]int
 }
 
 func NewMCPProxy(c *Collector, servers map[string]string) *MCPProxy {
 	return &MCPProxy{
-		collector: c,
-		servers:   servers,
-		client:    &http.Client{Timeout: 60 * time.Second},
+		collector:     c,
+		servers:       servers,
+		client:        &http.Client{Timeout: 60 * time.Second},
+		latencyWindow: make(map[string][]int),
 	}
 }
 
@@ -95,6 +99,10 @@ func (m *MCPProxy) recordCall(name, url, method string, latencyMS int, errMsg st
 		}
 	}
 	newAvg := 0.9*oldAvg + 0.1*float64(latencyMS)
+	m.latencyMu.Lock()
+	m.latencyWindow[name] = appendLatencyWindow(m.latencyWindow[name], latencyMS)
+	p95 := computeP95(m.latencyWindow[name])
+	m.latencyMu.Unlock()
 	_ = m.collector.store.UpsertMCPServer(&schema.MCPServer{
 		Name:             name,
 		URL:              url,
@@ -103,7 +111,7 @@ func (m *MCPProxy) recordCall(name, url, method string, latencyMS int, errMsg st
 		TotalCalls:       1,
 		ErrorCount:       errCount,
 		AvgLatencyMS:     newAvg,
-		P95LatencyMS:     float64(latencyMS),
+		P95LatencyMS:     p95,
 		AvgResponseBytes: respSize,
 	})
 	if method == "" {

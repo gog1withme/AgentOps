@@ -6,6 +6,8 @@ Local-first observability for AI coding agents — passive hooks, privacy scrubb
 
 ## What's new
 
+**[v1.0.1 (2026-05-26)](docs/releases/v1.0.1.md)** — Honest MCP p95 metrics, configurable model pricing, Context Inspector callouts, `agentops upgrade`, richer `agentops diff`. [Release notes →](docs/releases/v1.0.1.md)
+
 **[v1.0.0 (2026-05-25)](docs/releases/v1.0.0.md)** — First public release: live agent feed, LLM cost tracking, trace replay with one-click restore, MCP health, AI blame, and privacy scrubbing. [Full release notes →](docs/releases/v1.0.0.md)
 
 ![AgentOps live activity feed showing real-time Cursor file edits](docs/assets/v1.0.0/live-activity-feed.png)
@@ -145,11 +147,14 @@ The Go server serves static files from `dashboard/out` when present (or from `~/
 | `agentops restore` | Time-travel file restore |
 | `agentops trace list` | List sessions |
 | `agentops replay <id>` | Timeline replay |
+| `agentops diff <a> <b>` | Compare two sessions (counts, files, models, efficiency) |
 | `agentops blame <file>` | AI edit attribution |
 | `agentops prompt list/diff` | Prompt versioning |
+| `agentops context summary` | Duplicate and noisy context analysis |
 | `agentops mcp list` | MCP health |
 | `agentops alerts` | Active alerts |
-| `agentops doctor` | Health checks |
+| `agentops doctor` | Health checks (includes pricing config) |
+| `agentops upgrade` | Self-update from GitHub Releases |
 | `agentops sec scan` | Security scan |
 
 ## Architecture
@@ -165,6 +170,7 @@ Dogfood validation checklist: [docs/dogfood-checklist.md](docs/dogfood-checklist
 - `AGENTOPS_PORT` — dashboard/API port (default 4318); written to `~/.agentops/env.ps1` or `env.sh` on init
 - `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL` — set via `agentops env` so Cursor routes LLM calls through `/proxy`
 - `AGENTOPS_DATA_DIR` — override data directory
+- `AGENTOPS_PRICING` — override path to model pricing JSON (default `~/.agentops/pricing.json`)
 - `AGENTOPS_REDACT_CONTENT=1` — redact all content fields
 - `AGENTOPS_NO_SNAPSHOTS=1` — disable snapshots
 - `AGENTOPS_NO_BROWSER=1` — skip opening browser on dev

@@ -3,7 +3,9 @@
 > Universal telemetry + observability layer for AI coding agents.
 > "Datadog + Linear for AI developer workflows."
 
-> **Public roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md) — user-facing feature direction. This file is the internal build spec.
+> **Shipped status:** See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/releases/](docs/releases/) for what is live today (v1.0.1). This file is the internal build spec — checkboxes below track aspirational scope, not release status.
+
+> **Public roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md) — user-facing feature direction.
 
 ---
 

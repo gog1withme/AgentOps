@@ -102,3 +102,21 @@ export interface Snapshot {
   timestamp: string;
   trigger: string;
 }
+
+export interface ContextFileStat {
+  path: string;
+  occurrences: number;
+  total_tokens: number;
+  avg_efficiency: number;
+  consecutive_hits?: number;
+}
+
+export interface ContextAnalysis {
+  session_id: string;
+  total_prompt_tokens: number;
+  llm_call_count: number;
+  avg_efficiency: number;
+  duplicate_files: ContextFileStat[];
+  noisy_files: ContextFileStat[];
+  callouts: string[];
+}

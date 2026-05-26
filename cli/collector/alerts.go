@@ -36,7 +36,7 @@ func (a *AlertsEngine) Check(e *schema.Event) *schema.AlertRecord {
 		}
 	}
 	if e.Type == schema.EventMCPCall && e.MCPLatencyMS > 2000 {
-		alert = a.makeAlert(e.SessionID, "mcp_slow", "warning", "MCP server "+e.MCPServer+" latency > 2s")
+		alert = a.makeAlert(e.SessionID, "mcp_slow", "warning", "MCP server "+e.MCPServer+" call latency > 2s")
 	}
 	if alert != nil {
 		_ = a.store.WriteAlert(alert)

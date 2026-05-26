@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gog1withme/AgentOps/cli/pricing"
 	"github.com/gog1withme/AgentOps/cli/store"
 	"github.com/gog1withme/AgentOps/schema"
 	"github.com/rs/zerolog/log"
@@ -225,7 +226,7 @@ func parseAnthropicUsage(body []byte, model string) (promptTokens, outputTokens 
 			outputTokens = int(v)
 		}
 	}
-	cost = estimateCost(model, promptTokens, outputTokens)
+	cost = pricing.Global().EstimateCost(model, promptTokens, outputTokens)
 	return
 }
 
@@ -281,16 +282,12 @@ func parseUsage(body []byte, model string) (promptTokens, outputTokens int, cost
 	if v, ok := usage["completion_tokens"].(float64); ok {
 		outputTokens = int(v)
 	}
-	cost = estimateCost(model, promptTokens, outputTokens)
+	cost = pricing.Global().EstimateCost(model, promptTokens, outputTokens)
 	return
 }
 
 func estimateCost(model string, pt, ot int) float64 {
-	inRate, outRate := 0.000003, 0.000015
-	if strings.Contains(model, "gpt-4") || strings.Contains(model, "claude-3") {
-		inRate, outRate = 0.00001, 0.00003
-	}
-	return float64(pt)*inRate + float64(ot)*outRate
+	return pricing.Global().EstimateCost(model, pt, ot)
 }
 
 func extractOutputText(body []byte) string {

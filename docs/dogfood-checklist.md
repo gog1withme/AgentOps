@@ -2,6 +2,8 @@
 
 Manual validation for AgentOps integration before public release. Run on your daily driver (Windows first), then macOS or Linux.
 
+**Automated gate (v1.0.1):** `go test ./cli/...` — passed on Windows 2026-05-26.
+
 **Setup before each session**
 
 1. `agentops init` (once)

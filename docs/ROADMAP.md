@@ -17,9 +17,9 @@ timeline
 
 ## Shipped in 1.0
 
-Everything below is available today.
+Everything below is available today (see [v1.0.1 patch notes](releases/v1.0.1.md) for latest hardening).
 
-- **CLI** — `init`, `dev`, `env`, `budget`, `restore`, `trace`, `replay`, `blame`, `prompt`, `mcp`, `alerts`, `sec`, `doctor`
+- **CLI** — `init`, `dev`, `env`, `budget`, `restore`, `trace`, `replay`, `diff`, `blame`, `prompt`, `mcp`, `alerts`, `sec`, `doctor`, `upgrade`, `context summary`
 - **Passive collection** — OpenAI-compatible LLM proxy, shell hooks, filesystem watcher, MCP monitoring
 - **Privacy** — Pre-storage scrubber (`sk-*`, AWS keys, JWTs, `.env` values); extend via `~/.agentops/scrub_patterns.txt`
 - **Budgets** — Session cost/tool/LLM limits with `alert`, `pause`, or `kill` actions
@@ -37,12 +37,12 @@ See [v1.0.0 release notes](releases/v1.0.0.md) for use cases and screenshots.
 
 | Feature | Why it matters |
 |---|---|
-| Complete context inspector | Duplicate/noisy context detection, per-file token weight, memory drift tracking |
+| ~~Complete context inspector~~ | *Partial in 1.0.1:* duplicate/noisy detection + callouts; memory drift and per-segment weight remain |
 | Configurable alerts + webhooks | Route critical alerts to Slack, Discord, or PagerDuty instead of only the dashboard |
 | Smart insights callouts | "42% of tokens wasted on duplicate context", "MCP server latency 3x vs last session" |
 | Prompt eval foundation | `agentops eval run <tests/>` — compare prompt versions against test cases |
-| Trace diff | `agentops diff <run_a> <run_b>` — compare two agent sessions side by side |
-| Self-update | `agentops upgrade` — one-command updates from GitHub Releases |
+| ~~Trace diff~~ | *Shipped in 1.0.1 (CLI):* counts, file overlap, models, efficiency — full side-by-side UI in 1.1 |
+| ~~Self-update~~ | *Shipped in 1.0.1:* `agentops upgrade` — one-command updates from GitHub Releases |
 | Deep SDK hooks (optional) | LangChain, Vercel AI SDK, OpenAI Agents SDK, AutoGen, CrewAI |
 
 ---

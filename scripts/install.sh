@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="gog1withme/AgentOps"
-VERSION="${AGENTOPS_VERSION:-1.0.0}"
+VERSION="${AGENTOPS_VERSION:-1.0.1}"
 INSTALL_DIR="${AGENTOPS_INSTALL_DIR:-$HOME/.agentops}"
 SKIP_INIT="${AGENTOPS_SKIP_INIT:-0}"
 

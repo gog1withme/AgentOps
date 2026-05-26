@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/gog1withme/AgentOps/cli/store"
@@ -82,13 +83,98 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Printf("Session A (%s): %d events\n", args[0], len(a))
 	fmt.Printf("Session B (%s): %d events\n", args[1], len(b))
+
+	countsA := countByType(a)
+	countsB := countByType(b)
+	fmt.Println("\nEvent counts by type:")
+	for _, typ := range []schema.EventType{
+		schema.EventLLMCall, schema.EventFileEdit, schema.EventShellCmd, schema.EventMCPCall, schema.EventToolCall,
+	} {
+		if countsA[typ] == 0 && countsB[typ] == 0 {
+			continue
+		}
+		fmt.Printf("  %-14s  A=%d  B=%d\n", typ, countsA[typ], countsB[typ])
+	}
+
+	filesA := uniqueFiles(a)
+	filesB := uniqueFiles(b)
+	overlap := intersectSets(filesA, filesB)
+	fmt.Printf("\nFiles touched: A=%d  B=%d  overlap=%d\n", len(filesA), len(filesB), len(overlap))
+
 	costA, toolsA, llmsA, _ := st.SessionSpend(args[0], time.Time{})
 	costB, toolsB, llmsB, _ := st.SessionSpend(args[1], time.Time{})
-	fmt.Printf("A: cost=$%.4f tools=%d llm=%d\n", costA, toolsA, llmsA)
-	fmt.Printf("B: cost=$%.4f tools=%d llm=%d\n", costB, toolsB, llmsB)
+	fmt.Printf("\nSpend:\n  A: cost=$%.4f tools=%d llm=%d\n", costA, toolsA, llmsA)
+	fmt.Printf("  B: cost=$%.4f tools=%d llm=%d\n", costB, toolsB, llmsB)
+
+	modelsA, effA := llmBreakdown(a)
+	modelsB, effB := llmBreakdown(b)
+	fmt.Println("\nLLM models:")
+	allModels := maps.Clone(modelsA)
+	for m, c := range modelsB {
+		allModels[m] += c
+	}
+	for model := range allModels {
+		fmt.Printf("  %-24s  A=%d  B=%d\n", model, modelsA[model], modelsB[model])
+	}
+	if effA > 0 || effB > 0 {
+		fmt.Printf("\nAvg efficiency:  A=%.0f%%  B=%.0f%%  delta=%+.0f%%\n", effA, effB, effB-effA)
+	}
 	return nil
+}
+
+func countByType(events []schema.Event) map[schema.EventType]int {
+	out := make(map[schema.EventType]int)
+	for _, e := range events {
+		out[e.Type]++
+	}
+	return out
+}
+
+func uniqueFiles(events []schema.Event) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, e := range events {
+		if e.Type == schema.EventFileEdit && e.FilePath != "" {
+			out[e.FilePath] = struct{}{}
+		}
+	}
+	return out
+}
+
+func intersectSets(a, b map[string]struct{}) map[string]struct{} {
+	out := make(map[string]struct{})
+	for k := range a {
+		if _, ok := b[k]; ok {
+			out[k] = struct{}{}
+		}
+	}
+	return out
+}
+
+func llmBreakdown(events []schema.Event) (models map[string]int, avgEff float64) {
+	models = make(map[string]int)
+	var effSum float64
+	var effCount int
+	for _, e := range events {
+		if e.Type != schema.EventLLMCall {
+			continue
+		}
+		model := e.Model
+		if model == "" {
+			model = "(unknown)"
+		}
+		models[model]++
+		if e.EfficiencyScore > 0 {
+			effSum += e.EfficiencyScore
+			effCount++
+		}
+	}
+	if effCount > 0 {
+		avgEff = effSum / float64(effCount)
+	}
+	return models, avgEff
 }
 
 func eventSummary(e schema.Event) string {

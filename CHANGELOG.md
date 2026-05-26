@@ -2,6 +2,28 @@
 
 All notable changes to AgentOps are documented in this file.
 
+## [1.0.1] - 2026-05-26
+
+Patch release focused on metric accuracy, context intelligence, and self-update.
+
+> Full release notes: [docs/releases/v1.0.1.md](docs/releases/v1.0.1.md)
+
+### Added
+
+- **`agentops upgrade`** — Self-update from GitHub Releases with checksum verification (`--check` for dry-run)
+- **`agentops context summary`** — Terminal summary of duplicate and noisy context
+- **`/api/context/analysis`** — Context Inspector backend: duplicate file detection, noisy context callouts, session summary cards
+- **Configurable model pricing** — Bundled defaults + user overrides at `~/.agentops/pricing.json`; surfaced in `agentops doctor`
+
+### Fixed
+
+- **MCP p95 latency** — Now computed from a rolling window of the last 100 calls (previously stored latest-call latency mislabeled as p95)
+- **Richer `agentops diff`** — Per-type event counts, file overlap, model breakdown, and efficiency delta between sessions
+
+### Changed
+
+- Context Inspector dashboard shows summary cards and actionable callouts when duplicate or low-efficiency context is detected
+
 ## [1.0.0] - 2026-05-25
 
 First public release of AgentOps — local-first observability for AI coding agents.
@@ -32,4 +54,5 @@ brew install agentops
 irm https://raw.githubusercontent.com/gog1withme/AgentOps/main/scripts/install.ps1 | iex
 ```
 
+[1.0.1]: https://github.com/gog1withme/AgentOps/releases/tag/v1.0.1
 [1.0.0]: https://github.com/gog1withme/AgentOps/releases/tag/v1.0.0

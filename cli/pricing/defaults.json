@@ -1,0 +1,18 @@
+{
+  "models": [
+    {"pattern": "gpt-4o-mini", "input_per_token": 0.00000015, "output_per_token": 0.0000006},
+    {"pattern": "gpt-4o", "input_per_token": 0.0000025, "output_per_token": 0.00001},
+    {"pattern": "gpt-4-turbo", "input_per_token": 0.00001, "output_per_token": 0.00003},
+    {"pattern": "gpt-4", "input_per_token": 0.00003, "output_per_token": 0.00006},
+    {"pattern": "gpt-3.5", "input_per_token": 0.0000005, "output_per_token": 0.0000015},
+    {"pattern": "o1-mini", "input_per_token": 0.000003, "output_per_token": 0.000012},
+    {"pattern": "o1", "input_per_token": 0.000015, "output_per_token": 0.00006},
+    {"pattern": "o3-mini", "input_per_token": 0.0000011, "output_per_token": 0.0000044},
+    {"pattern": "claude-3-5-haiku", "input_per_token": 0.0000008, "output_per_token": 0.000004},
+    {"pattern": "claude-3-5-sonnet", "input_per_token": 0.000003, "output_per_token": 0.000015},
+    {"pattern": "claude-3-opus", "input_per_token": 0.000015, "output_per_token": 0.000075},
+    {"pattern": "claude-3", "input_per_token": 0.000003, "output_per_token": 0.000015},
+    {"pattern": "claude", "input_per_token": 0.000003, "output_per_token": 0.000015},
+    {"pattern": "default", "input_per_token": 0.000003, "output_per_token": 0.000015}
+  ]
+}

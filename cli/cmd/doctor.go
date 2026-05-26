@@ -13,6 +13,7 @@ import (
 	"github.com/gog1withme/AgentOps/cli/hooks"
 	"github.com/gog1withme/AgentOps/cli/internal/config"
 	"github.com/gog1withme/AgentOps/cli/internal/paths"
+	"github.com/gog1withme/AgentOps/cli/pricing"
 	"github.com/gog1withme/AgentOps/cli/scrubber"
 	"github.com/gog1withme/AgentOps/cli/server"
 	"github.com/gog1withme/AgentOps/cli/store"
@@ -50,6 +51,17 @@ var doctorCmd = &cobra.Command{
 		if err != nil && doctorVerbose {
 			hint("Run `agentops init` to create default scrub patterns.")
 		}
+
+		pr := pricing.Global()
+		pricingDetail := fmt.Sprintf("%d models configured", pr.ModelCount())
+		if unknown := pr.UnknownModels(); len(unknown) > 0 {
+			pricingDetail = fmt.Sprintf("%s, %d unknown model(s) seen", pricingDetail, len(unknown))
+		}
+		check("Model pricing", true, pricingDetail)
+		if doctorVerbose {
+			hint(fmt.Sprintf("Override rates in %s", paths.PricingPath()))
+		}
+
 		check("Data directory", paths.EnsureDirs() == nil, paths.DataDir())
 
 		if _, err := exec.LookPath("git"); err != nil {
